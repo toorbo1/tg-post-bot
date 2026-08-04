@@ -9,7 +9,7 @@ from datetime import datetime
 # Добавляем путь к проекту
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ai_functions import generate_ai_post, generate_pixel_city_image, generate_pixel_city_shedevrum
+from ai_functions import generate_pixel_city_image
 
 
 class PostGeneratorApp:
@@ -179,7 +179,8 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             ]
             topic = topics[os.urandom(1)[0] % len(topics)]
 
-            text = generate_ai_post(topic, "long")
+            # Заглушка для текста пока DeepSeek не настроен
+            text = f"Пост о {topic}\n\nОчень подробный текст на эту тему...\n\n#хештег"
 
             # Обновляем UI в главном потоке
             self.root.after(0, lambda: self._update_text(text))
