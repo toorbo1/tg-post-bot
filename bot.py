@@ -570,14 +570,15 @@ CATEGORY_HASHTAGS = {
     "funny": "",
 }
 
-AI_STUDIO_KEY = os.environ.get("AI_STUDIO_KEY", "")
+DEEPSEEK_SESSION_ID = os.environ.get("DEEPSEEK_SESSION_ID", "")
 
 def generate_ai_post(topic, style="casual"):
-    """Генерирует пост через AI Studio — живой текст от лица Каролины"""
+    """Генерирует пост через DeepSeek (веб-версия) — живой текст от лица Каролины"""
     global used_ai_prompts
 
-    # Если нет ключа AI Studio, используем локальные шаблоны
-    if not AI_STUDIO_KEY:
+    # Проверяем наличие session ID
+    if not DEEPSEEK_SESSION_ID:
+        logger.warning("DEEPSEEK_SESSION_ID not set, using local templates")
         return generate_local_post(topic, style)
 
     styles = {
@@ -623,9 +624,14 @@ def generate_ai_post(topic, style="casual"):
     if len(used_ai_prompts) > 15:
         used_ai_prompts = used_ai_prompts[-8:]
 
+    # Генерация через DeepSeek API
     try:
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent"
-        params = {"key": AI_STUDIO_KEY}
+        url = "https://api.deepseek.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_SESSION_ID}",
+            "Content-Type": "application/json"
+        }
+
         system_instruction = """Ты — Каролина, пиксельная 2D-девочка из цифрового мира. Ты пишешь посты для Telegram-канала про IT, технологии и интернет.
 
 Твой стиль:
@@ -634,40 +640,41 @@ def generate_ai_post(topic, style="casual"):
 - Личное мнение и эмоции
 - Без шаблонных фраз типа 'в современном мире'
 - Пиши так, как будто рассказываешь подруге
+- Используй HTML теги <b> для выделения важных моментов
+- Добавляй списки с эмодзи
+- В конце добавь 2-3 хештега по теме
 
-Важно: каждый пост должен быть уникальным и отличаться от других."""
+Важно: каждый пост должен быть уникальным, подробным и отличаться от других."""
 
         payload = {
-            "systemInstruction": {"parts": [{"text": system_instruction}]},
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
-            "generationConfig": {
-                "temperature": 0.9,
-                "maxOutputTokens": 2048,
-                "topP": 0.95,
-                "topK": 40,
-            }
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.9,
+            "max_tokens": 2048,
+            "top_p": 0.95,
+            "stream": False
         }
 
-        response = requests.post(url, params=params, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
             data = response.json()
-            text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             text = text.strip()
-            # Убираем возможные markdown-заголовки
-            text = text.replace("# ", "").replace("## ", "")
             if len(text) > 10:
-                logger.info(f"AI Studio generated post successfully")
+                logger.info(f"DeepSeek generated post successfully")
                 return text
             else:
-                logger.warning(f"AI Studio returned short text: {len(text)} chars")
+                logger.warning(f"DeepSeek returned short text: {len(text)} chars")
         else:
-            logger.error(f"AI Studio API error: {response.status_code} - {response.text[:200]}")
+            logger.error(f"DeepSeek API error: {response.status_code} - {response.text[:200]}")
     except Exception as e:
-        logger.warning(f"AI Studio generation failed: {e}")
+        logger.warning(f"DeepSeek generation failed: {e}")
 
-    return None
+    # Fallback to local templates
+    return generate_local_post(topic, style)
 
 
 def generate_auto_post():
