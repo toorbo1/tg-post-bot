@@ -91,191 +91,59 @@ def generate_ai_post(topic, style="long"):
 
 
 def generate_pixel_city_image():
-    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через веб Шедеврума с Selenium"""
+    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations.ai (быстро и без ключа)"""
+
+    # Промпт для пиксельного города
+    style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, high quality, crisp edges, ultra detailed"
 
     try:
-        from selenium import webdriver
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        import io
-        from PIL import Image
+        # Используем Pollinations.ai (работает без ключа, быстро!)
+        encoded_prompt = requests.utils.quote(style_prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&model=turbo"
 
-        # Промпт для пиксельного города
-        style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio"
+        logger.info(f"Generating pixel city via Pollinations (fast)...")
 
-        logger.info(f"🎨 Opening SheDevrum web...")
+        response = requests.get(url, timeout=120)
 
-        # Запускаем браузер
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
+        if response.status_code == 200:
+            from PIL import Image
+            import io
 
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(60)
+            img = Image.open(io.BytesIO(response.content))
+            width, height = img.size
+            logger.info(f"Generated image: {width}x{height}")
 
-        try:
-            # Открываем Шедеврум
-            driver.get("https://shedevrum.yandex.ru/")
-            logger.info("Page loaded")
+            # Проверяем соотношение сторон и обрезаем до 4:3
+            target_ratio = 4/3
+            current_ratio = width / height
 
-            # Ждём загрузки страницы (5 секунд)
-            time.sleep(5)
-
-            # Ищем все textarea и input элементы
-            logger.info("Searching for input field...")
-
-            # Пробуем разные селекторы
-            selectors = [
-                "textarea",
-                "input[type='text']",
-                "[contenteditable='true']",
-                ".prompt-input",
-                "#prompt-input",
-                "div[role='textbox']"
-            ]
-
-            input_box = None
-            for selector in selectors:
-                try:
-                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if elements:
-                        input_box = elements[0]
-                        logger.info(f"Found input with selector: {selector}")
-                        break
-                except:
-                    continue
-
-            if not input_box:
-                # Если не нашли по селектору, ищем первый кликабельный элемент
-                all_elements = driver.find_elements(By.TAG_NAME, "*")
-                for elem in all_elements:
-                    try:
-                        if elem.is_displayed() and elem.tag_name in ['input', 'textarea', 'div']:
-                            input_box = elem
-                            logger.info("Found clickable element by tag")
-                            break
-                    except:
-                        continue
-
-            if not input_box:
-                raise Exception("Could not find input field on page")
-
-            # Кликаем на поле ввода и вводим промпт
-            input_box.click()
-            time.sleep(1)
-
-            # Вводим текст посимвольно (как человек)
-            for char in style_prompt:
-                input_box.send_keys(char)
-                time.sleep(0.01)
-
-            logger.info("Prompt entered successfully")
-            time.sleep(1)
-
-            # Ищем и кликаем кнопку генерации
-            buttons = driver.find_elements(By.TAG_NAME, "button")
-            generate_btn = None
-
-            for btn in buttons:
-                if btn.is_displayed():
-                    text = btn.text.lower()
-                    if any(word in text for word in ["сгенерировать", "generate", "создать", "create", "go"]):
-                        generate_btn = btn
-                        break
-
-            if not generate_btn:
-                # Если не нашли кнопку по тексту, ищем по типичным классам
-                try:
-                    generate_btn = driver.find_element(By.CSS_SELECTOR, "button[class*='submit'], button[class*='send'], .action-button")
-                except:
-                    # Последняя надежда - Enter в поле ввода
-                    logger.info("No button found, pressing Enter in input")
-                    input_box.send_keys(Keys.RETURN)
-                    generate_btn = True  # Фейковая кнопка
-
-            if generate_btn and isinstance(generate_btn, type(True)) == False:
-                generate_btn.click()
-                logger.info("Generation button clicked")
-
-            # Ждём результат (может занять 30-120 секунд)
-            logger.info("Waiting for generation (this may take 1-2 minutes)...")
-
-            # Ждём появления изображения с разными селекторами
-            result_img = None
-            img_selectors = [
-                "img.generated",
-                "img.result",
-                ".image-container img",
-                ".result-image",
-                "[class*='image'] img",
-                "img[src]"
-            ]
-
-            wait = WebDriverWait(driver, 180)  # 3 минуты ожидания
-
-            for selector in img_selectors:
-                try:
-                    result_img = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, selector)),
-                    )
-                    logger.info(f"Found image with selector: {selector}")
-                    break
-                except:
-                    continue
-
-            if not result_img:
-                raise Exception("Image generation timed out")
-
-            # Получаем src изображения
-            img_src = result_img.get_attribute("src")
-            logger.info(f"Image generated: {img_src[:100]}...")
-
-            # Скачиваем изображение
-            img_response = requests.get(img_src, timeout=60)
-            if img_response.status_code == 200:
-                img = Image.open(io.BytesIO(img_response.content))
-                width, height = img.size
-                logger.info(f"✅ SheDevrum generated pixel city: {width}x{height}")
-
-                # Обрезаем до 4:3 если нужно
-                target_ratio = 4/3
-                current_ratio = width / height
-
-                if abs(current_ratio - target_ratio) > 0.1:
-                    logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
-                    if current_ratio > target_ratio:
-                        new_width = int(height * target_ratio)
-                        left = (width - new_width) // 2
-                        img = img.crop((left, 0, left + new_width, height))
-                    else:
-                        new_height = int(width / target_ratio)
-                        top = (height - new_height) // 2
-                        img = img.crop((0, top, width, top + new_height))
+            if abs(current_ratio - target_ratio) > 0.1:
+                logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
+                if current_ratio > target_ratio:
+                    new_width = int(height * target_ratio)
+                    left = (width - new_width) // 2
+                    img = img.crop((left, 0, left + new_width, height))
+                else:
+                    new_height = int(width / target_ratio)
+                    top = (height - new_height) // 2
+                    img = img.crop((0, top, width, top + new_height))
 
                 buffer = io.BytesIO()
                 img.save(buffer, format='PNG', quality=95)
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_city_{random.randint(1, 999999)}.png")
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
                 with open(temp_file, 'wb') as f:
                     f.write(buffer.getvalue())
-                logger.info(f"Saved to: {temp_file}")
+                logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
                 return temp_file
             else:
-                logger.error(f"Failed to download image: {img_response.status_code}")
-
-        finally:
-            driver.quit()
-
-    except ImportError:
-        logger.error("Selenium not installed. Install with: pip install selenium")
-        return None
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                with open(temp_file, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Saved pixel city: {width}x{height}")
+                return temp_file
+        else:
+            logger.error(f"Pollinations error: {response.status_code}")
     except Exception as e:
-        logger.error(f"SheDevrum web generation failed: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"Image generation failed: {e}")
 
     return None
