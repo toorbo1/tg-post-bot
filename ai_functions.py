@@ -178,9 +178,9 @@ def generate_pixel_city_shedevrum():
         driver.set_page_load_timeout(60)
 
         try:
-            # Открываем Шедеврум (правильный URL)
+            # Открываем Шедеврум (актуальный URL)
             logger.info("Loading SheDevrum page...")
-            driver.get("https://shedevrum.com/")
+            driver.get("https://shedevrum.ai/")
 
             # Ждём полной загрузки страницы
             time.sleep(5)
