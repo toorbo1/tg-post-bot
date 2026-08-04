@@ -182,6 +182,12 @@ def generate_pixel_city_shedevrum():
             logger.info("Loading SheDevrum page...")
             driver.get("https://shedevrum.ai/")
 
+            # Проверяем нет ли редиректа на авторизацию
+            time.sleep(3)
+            current_url = driver.current_url
+            if "passport.yandex" in current_url or "auth" in current_url:
+                raise Exception("SheDevrum requires Yandex authentication. Please login manually first.")
+
             # Ждём полной загрузки страницы
             time.sleep(5)
 
