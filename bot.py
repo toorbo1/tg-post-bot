@@ -11,6 +11,9 @@ import telebot
 from telebot import types
 from duckduckgo_search import DDGS
 
+# Импортируем AI функции
+from ai_functions import generate_ai_post, generate_pixel_city_image
+
 # Загружаем переменные из .env файла
 from dotenv import load_dotenv
 load_dotenv()
@@ -899,8 +902,8 @@ def search_image(query):
     if not query:
         query = "technology"
 
-    # Сначала пробуем сгенерировать пиксельную картинку
-    pixel_art = generate_pixel_art_image(query)
+    # Сначала пробуем сгенерировать пиксельный город
+    pixel_art = generate_pixel_city_image()
     if pixel_art:
         return pixel_art
 
