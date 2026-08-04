@@ -747,17 +747,17 @@ POLLINATIONS_KEY = os.environ.get("POLLINATIONS_KEY", "")
 
 def generate_pixel_art_image(prompt_text):
     """Генерирует пиксельную картинку через Pollinations.ai"""
-    # Промпт в стиле персонажа: 2D pixel art, cartoon, hacker girl, purple/black theme
-    style_prompt = f"2D pixel art, cartoon style, chibi character, {prompt_text}, purple and black color scheme, cyberpunk aesthetic, minimalist, retro game art, 16-bit, sharp details, high quality"
+    # Промпт с максимальным качеством: четкие линии, высокая детализация
+    style_prompt = f"2D pixel art, ultra sharp focus, high definition, crystal clear details, chibi character, {prompt_text}, purple and black color scheme, cyberpunk aesthetic, minimalist, retro game art, 16-bit, professional quality, crisp edges, no blur"
 
     # Кодируем промпт для URL
     encoded_prompt = requests.utils.quote(style_prompt)
 
-    # Pollinations.ai (без ключа или с ключом если есть) - увеличенное разрешение 1024x1024
+    # Pollinations.ai - максимальное качество 1024x1024 с параметрами четкости
     if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=high"
     else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=high"
 
     try:
         response = requests.get(url, timeout=30)
