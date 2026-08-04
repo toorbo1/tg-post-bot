@@ -79,7 +79,11 @@ class PostGeneratorApp:
         notebook.add(img_frame, text="Изображение")
 
         self.img_status = ttk.Label(img_frame, text="Изображение будет здесь", anchor=tk.CENTER)
-        self.img_status.pack(expand=True)
+        self.img_status.pack(expand=True, pady=(0, 10))
+
+        # Область для отображения картинки
+        self.img_label = tk.Label(img_frame, bg="#f0f0f0")
+        self.img_label.pack(expand=True)
 
         # Вкладка настроек
         settings_frame = ttk.Frame(notebook, padding="10")
@@ -172,17 +176,45 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
         self.text_widget.config(state=tk.DISABLED)
 
     def _show_image(self, image_path):
-        if image_path:
+        if image_path and os.path.exists(image_path):
             filename = os.path.basename(image_path)
-            self.img_status.config(
-                text=f"✓ Изображение сохранено\n{filename}",
-                foreground="green"
-            )
+
+            # Загружаем и показываем изображение
+            try:
+                from PIL import Image, ImageTk
+
+                img = Image.open(image_path)
+
+                # Масштабируем под размер окна (макс 400x300)
+                max_size = (400, 300)
+                img.thumbnail(max_size, Image.LANCZOS)
+
+                # Конвертируем в формат для tkinter
+                photo = ImageTk.PhotoImage(img)
+                self.img_label.config(image=photo)
+                self.img_label.image = photo  # сохраняем ссылку
+
+                self.img_status.config(
+                    text=f"✓ Изображение сохранено\n{filename} ({img.size[0]}x{img.size[1]})",
+                    foreground="green"
+                )
+            except ImportError:
+                self.img_status.config(
+                    text=f"✓ Файл сохранён\n{filename}\nУстанови Pillow для просмотра",
+                    foreground="green"
+                )
+            except Exception as e:
+                self.img_status.config(
+                    text=f"Ошибка отображения: {e}",
+                    foreground="red"
+                )
         else:
             self.img_status.config(
                 text="✗ Ошибка генерации изображения",
                 foreground="red"
             )
+            self.img_label.config(image='')
+            self.img_label.image = None
 
     def _show_error(self, error_msg):
         self.text_widget.config(state=tk.NORMAL)

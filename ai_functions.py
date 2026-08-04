@@ -90,59 +90,113 @@ def generate_ai_post(topic, style="long"):
 
 
 def generate_pixel_city_image():
-    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations.ai в высоком качестве 4:3"""
-
-    # Промпт для пиксельного города
-    style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, high quality, crisp edges, ultra detailed"
+    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через веб Шедеврума с Selenium"""
 
     try:
-        # Используем Pollinations.ai (работает без ключа)
-        encoded_prompt = requests.utils.quote(style_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&model=turbo"
+        from selenium import webdriver
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import io
+        from PIL import Image
 
-        logger.info(f"Generating pixel city via Pollinations...")
+        # Промпт для пиксельного города
+        style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio"
 
-        response = requests.get(url, timeout=120)
+        logger.info(f"🎨 Opening SheDevrum web...")
 
-        if response.status_code == 200:
-            from PIL import Image
-            import io
+        # Запускаем браузер
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
 
-            img = Image.open(io.BytesIO(response.content))
-            width, height = img.size
-            logger.info(f"Generated image: {width}x{height}")
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(60)
 
-            # Проверяем соотношение сторон и обрезаем до 4:3
-            target_ratio = 4/3
-            current_ratio = width / height
+        try:
+            # Открываем Шедеврум
+            driver.get("https://shedevrum.yandex.ru/")
+            logger.info("Page loaded")
 
-            if abs(current_ratio - target_ratio) > 0.1:
-                logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
-                if current_ratio > target_ratio:
-                    new_width = int(height * target_ratio)
-                    left = (width - new_width) // 2
-                    img = img.crop((left, 0, left + new_width, height))
-                else:
-                    new_height = int(width / target_ratio)
-                    top = (height - new_height) // 2
-                    img = img.crop((0, top, width, top + new_height))
+            # Ждём появления поля ввода
+            wait = WebDriverWait(driver, 30)
+            input_box = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "textarea, input[type='text']")))
+
+            # Вводим промпт
+            input_box.clear()
+            input_box.send_keys(style_prompt)
+            logger.info("Prompt entered")
+
+            # Ищем кнопку генерации и кликаем
+            buttons = driver.find_elements(By.CSS_SELECTOR, "button")
+            generate_btn = None
+            for btn in buttons:
+                if "Сгенерировать" in btn.text or "Generate" in btn.text or "Создать" in btn.text:
+                    generate_btn = btn
+                    break
+
+            if not generate_btn:
+                # Пробуем найти по типичным классам
+                generate_btn = driver.find_element(By.CSS_SELECTOR, "button[class*='generate'], button[class*='create'], button[class*='submit']")
+
+            generate_btn.click()
+            logger.info("Generation started")
+
+            # Ждём результат (может занять 30-120 секунд)
+            logger.info("Waiting for generation (30-120 seconds)...")
+
+            # Ждём появления изображения
+            result_img = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "img.generated, img.result, .image-container img")),
+                message="Timeout waiting for image"
+            )
+
+            # Получаем src изображения
+            img_src = result_img.get_attribute("src")
+            logger.info(f"Image generated: {img_src[:100]}")
+
+            # Скачиваем изображение
+            img_response = requests.get(img_src, timeout=60)
+            if img_response.status_code == 200:
+                img = Image.open(io.BytesIO(img_response.content))
+                width, height = img.size
+                logger.info(f"✅ SheDevrum generated pixel city: {width}x{height}")
+
+                # Обрезаем до 4:3 если нужно
+                target_ratio = 4/3
+                current_ratio = width / height
+
+                if abs(current_ratio - target_ratio) > 0.1:
+                    logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
+                    if current_ratio > target_ratio:
+                        new_width = int(height * target_ratio)
+                        left = (width - new_width) // 2
+                        img = img.crop((left, 0, left + new_width, height))
+                    else:
+                        new_height = int(width / target_ratio)
+                        top = (height - new_height) // 2
+                        img = img.crop((0, top, width, top + new_height))
 
                 buffer = io.BytesIO()
                 img.save(buffer, format='PNG', quality=95)
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_city_{random.randint(1, 999999)}.png")
                 with open(temp_file, 'wb') as f:
                     f.write(buffer.getvalue())
-                logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
+                logger.info(f"Saved to: {temp_file}")
                 return temp_file
             else:
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
-                with open(temp_file, 'wb') as f:
-                    f.write(response.content)
-                logger.info(f"Saved pixel city: {width}x{height}")
-                return temp_file
-        else:
-            logger.error(f"Pollinations error: {response.status_code}")
+                logger.error(f"Failed to download image: {img_response.status_code}")
+
+        finally:
+            driver.quit()
+
+    except ImportError:
+        logger.error("Selenium not installed. Install with: pip install selenium")
+        return None
     except Exception as e:
-        logger.error(f"SheDevrum generation failed: {e}")
+        logger.error(f"SheDevrum web generation failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
     return None
