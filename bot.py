@@ -578,8 +578,8 @@ def generate_ai_post(topic, style="casual"):
 
     # Проверяем наличие session ID
     if not DEEPSEEK_SESSION_ID:
-        logger.warning("DEEPSEEK_SESSION_ID not set, using local templates")
-        return generate_local_post(topic, style)
+        logger.error("DEEPSEEK_SESSION_ID not set! Cannot generate post.")
+        return None
 
     styles = {
         "casual": "пиши как обычная девушка-геймер в телеге. Неформально, с эмоциями, лёгким сленгом. Можно без эмодзи или чуть-чуть. Как будто рассказываешь подруге.",
@@ -673,8 +673,9 @@ def generate_ai_post(topic, style="casual"):
     except Exception as e:
         logger.warning(f"DeepSeek generation failed: {e}")
 
-    # Fallback to local templates
-    return generate_local_post(topic, style)
+    # Нет fallback — только DeepSeek
+    logger.error("DeepSeek generation failed, returning None")
+    return None
 
 
 def generate_auto_post():
@@ -750,76 +751,87 @@ IT_IMAGES = [
     "https://images.unsplash.com/photo-1519389950473-47ba0277781c",  # coding
 ]
 
-POLLINATIONS_KEY = os.environ.get("POLLINATIONS_KEY", "")
+SHEDEVRUM_API_KEY = os.environ.get("SHEDEVRUM_API_KEY", "")
 
 def generate_pixel_art_image(prompt_text):
-    """Генерирует пиксельную картинку через Pollinations.ai с МАКСИМАЛЬНОЙ четкостью в формате 4:3"""
-    # Улучшенный промпт для максимальной резкости и детализации
-    style_prompt = f"sharp pixel art, 16-bit retro game style, character actively doing {prompt_text}, crisp pixels, no blur, high contrast, vibrant colors, detailed sprite, clean edges, pixel-perfect, 4:3 aspect ratio, purple cyan neon cyberpunk aesthetic, no anti-aliasing, crisp hard edges"
+    """Генерирует изображение через API Шедеврум в формате 4:3"""
 
-    # Кодируем промпт для URL
-    encoded_prompt = requests.utils.quote(style_prompt)
+    if not SHEDEVRUM_API_KEY:
+        logger.error("SHEDEVRUM_API_KEY not set! Cannot generate image.")
+        return None
 
-    # Pollinations.ai - формат 4:3 (1024x768)
-    # Сервис автоматически масштабирует до своих стандартных размеров
-    if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}"
-    else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true"
-
-    logger.info(f"Generating image with URL: {url[:150]}...")
+    # Промпт для Шедеврум
+    style_prompt = f"пиксель арт, 16-bit ретро стиль, персонаж делает {prompt_text}, чёткие пиксели, высокий контраст, яркие цвета, киберпанк эстетика, фиолетовый и голубой, без размытия, sharp focus, 4:3 aspect ratio"
 
     try:
-        response = requests.get(url, timeout=60)
+        # API Шедеврум (примерная структура - нужно уточнить документацию)
+        url = "https://api.shedevrum.yandex.ru/v1/generate"
+        headers = {
+            "Authorization": f"Bearer {SHEDEVRUM_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "prompt": style_prompt,
+            "width": 1024,
+            "height": 768,
+            "steps": 30,
+            "guidance_scale": 7.5,
+            "seed": random.randint(1, 999999)
+        }
+
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+
         if response.status_code == 200:
-            # Проверяем размер изображения
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(response.content))
-            width, height = img.size
-            logger.info(f"Generated image size: {width}x{height}")
+            data = response.json()
+            # Получаем URL или base64 изображения из ответа
+            image_url = data.get("result", {}).get("image_url") or data.get("result", {}).get("images", [{}])[0].get("url")
 
-            # Если соотношение не 4:3, обрезаем
-            target_ratio = 4/3
-            current_ratio = width / height
+            if image_url:
+                # Скачиваем изображение
+                img_response = requests.get(image_url, timeout=30)
+                if img_response.status_code == 200:
+                    from PIL import Image
+                    import io
 
-            if abs(current_ratio - target_ratio) > 0.1:
-                logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
-                # Обрезаем до 4:3
-                if current_ratio > target_ratio:
-                    # Слишком широкое - обрезаем по ширине
-                    new_width = int(height * target_ratio)
-                    left = (width - new_width) // 2
-                    img = img.crop((left, 0, left + new_width, height))
-                else:
-                    # Слишком высокое - обрезаем по высоте
-                    new_height = int(width / target_ratio)
-                    top = (height - new_height) // 2
-                    img = img.crop((0, top, width, top + new_height))
+                    img = Image.open(io.BytesIO(img_response.content))
+                    width, height = img.size
+                    logger.info(f"SheDevrum generated image: {width}x{height}")
 
-                # Сохраняем обрезанное изображение
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=95)
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
-                with open(temp_file, 'wb') as f:
-                    f.write(buffer.getvalue())
-                logger.info(f"Cropped pixel art to: {img.size[0]}x{img.size[1]} (4:3)")
-                return temp_file
-            else:
-                # Соотношение правильное, сохраняем как есть
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
-                with open(temp_file, 'wb') as f:
-                    f.write(response.content)
-                logger.info(f"Saved pixel art: {width}x{height} (4:3 ratio)")
-                return temp_file
-    except ImportError:
-        # Если PIL не установлен, просто сохраняем без проверки
-        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
-        with open(temp_file, 'wb') as f:
-            f.write(response.content)
-        return temp_file
+                    # Проверяем соотношение сторон
+                    target_ratio = 4/3
+                    current_ratio = width / height
+
+                    if abs(current_ratio - target_ratio) > 0.1:
+                        logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
+                        if current_ratio > target_ratio:
+                            new_width = int(height * target_ratio)
+                            left = (width - new_width) // 2
+                            img = img.crop((left, 0, left + new_width, height))
+                        else:
+                            new_height = int(width / target_ratio)
+                            top = (height - new_height) // 2
+                            img = img.crop((0, top, width, top + new_height))
+
+                        buffer = io.BytesIO()
+                        img.save(buffer, format='JPEG', quality=95)
+                        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_{random.randint(1, 999999)}.jpg")
+                        with open(temp_file, 'wb') as f:
+                            f.write(buffer.getvalue())
+                        logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
+                        return temp_file
+                    else:
+                        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_{random.randint(1, 999999)}.jpg")
+                        with open(temp_file, 'wb') as f:
+                            f.write(img_response.content)
+                        logger.info(f"Saved SheDevrum image: {width}x{height}")
+                        return temp_file
+
+            logger.warning("No image URL in SheDevrum response")
+        else:
+            logger.error(f"SheDevrum API error: {response.status_code} - {response.text[:200]}")
     except Exception as e:
-        logger.warning(f"Pixel art generation failed: {e}")
+        logger.error(f"SheDevrum generation failed: {e}")
 
     return None
 
