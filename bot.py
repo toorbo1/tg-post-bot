@@ -753,11 +753,11 @@ def generate_pixel_art_image(prompt_text):
     # Кодируем промпт для URL
     encoded_prompt = requests.utils.quote(style_prompt)
 
-    # Pollinations.ai - формат 1:1 квадрат (1024x1024) с максимальной четкостью
+    # Pollinations.ai - формат 4:3 (1024x768) с максимальной четкостью
     if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=high&style=raw"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=high&style=raw"
     else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=high&style=raw"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=high&style=raw"
 
     try:
         response = requests.get(url, timeout=30)
