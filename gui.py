@@ -185,18 +185,17 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             self.root.after(0, lambda: self._update_text(text))
 
             # Генерируем изображение выбранным методом
-            if method == "flux":
-                self.root.after(0, lambda: self.img_status.config(text="Генерация через FLUX Realism (15-30 сек)..."))
+            if method == "pollinations":
+                self.root.after(0, lambda: self.img_status.config(text="Pollinations (10-20 сек)..."))
+                from ai_functions import generate_pixel_city_image
+                image = generate_pixel_city_image()
+            elif method == "flux":
+                self.root.after(0, lambda: self.img_status.config(text="FLUX модель (15-30 сек)..."))
                 from ai_functions import generate_pixel_city_image
                 image = generate_pixel_city_image()
             elif method == "shedevrum_real":
-                self.root.after(0, lambda: self.img_status.config(text="Генерация через Шедеврум (в фоне, 1-3 мин)..."))
-                from shedevrum_headless import generate_pixel_city_shedevrum_headless
-                image = generate_pixel_city_shedevrum_headless()
-            else:
-                self.root.after(0, lambda: self.img_status.config(text="Генерация через Pollinations (10-20 сек)..."))
-                from ai_functions import generate_pixel_city_image
-                image = generate_pixel_city_image()
+                self.root.after(0, lambda: self.img_status.config(text="Шедеврум (не работает)..."))
+                image = None
 
             # Показываем результат
             self.root.after(0, lambda: self._show_image(image))
