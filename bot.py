@@ -746,27 +746,67 @@ IT_IMAGES = [
 POLLINATIONS_KEY = os.environ.get("POLLINATIONS_KEY", "")
 
 def generate_pixel_art_image(prompt_text):
-    """Генерирует пиксельную картинку через Pollinations.ai с МАКСИМАЛЬНОЙ четкостью"""
-    # Промпт: персонаж ДЕЛАЕТ то, что описано в посте
-    style_prompt = f"pixel art character actively doing {prompt_text}, action scene, dynamic pose, razor sharp edges, ultra detailed, 4K quality, purple and black theme, cyberpunk, clean lines, sharp pixel perfect, professional digital art, clear focus on action"
+    """Генерирует пиксельную картинку через Pollinations.ai с МАКСИМАЛЬНОЙ четкостью в формате 4:3"""
+    # Улучшенный промпт для максимальной резкости и детализации
+    style_prompt = f"sharp pixel art, 16-bit retro game style, character actively doing {prompt_text}, crisp pixels, no blur, high contrast, vibrant colors, detailed sprite, clean edges, pixel-perfect, 4:3 aspect ratio, purple cyan neon cyberpunk aesthetic, no anti-aliasing, crisp hard edges"
 
     # Кодируем промпт для URL
     encoded_prompt = requests.utils.quote(style_prompt)
 
-    # Pollinations.ai - формат 4:3 (1024x768) с максимальной четкостью
+    # Pollinations.ai - строго 4:3 (1024x768) с ультра-четкостью
+    # Используем больший размер для лучшего качества при сжатии
     if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=high&style=raw"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=ultra&style=raw&no-blur&sharp"
     else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=high&style=raw"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=ultra&style=raw&no-blur&sharp"
 
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=60)
         if response.status_code == 200:
-            # Сохраняем изображение во временный файл
-            temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
-            with open(temp_file, 'wb') as f:
-                f.write(response.content)
-            return temp_file
+            # Проверяем размер изображения
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(response.content))
+            width, height = img.size
+
+            # Если соотношение не 4:3, обрезаем
+            target_ratio = 4/3
+            current_ratio = width / height
+
+            if abs(current_ratio - target_ratio) > 0.1:
+                # Обрезаем до 4:3
+                if current_ratio > target_ratio:
+                    # Слишком широкое - обрезаем по ширине
+                    new_width = int(height * target_ratio)
+                    left = (width - new_width) // 2
+                    img = img.crop((left, 0, left + new_width, height))
+                else:
+                    # Слишком высокое - обрезаем по высоте
+                    new_height = int(width / target_ratio)
+                    top = (height - new_height) // 2
+                    img = img.crop((0, top, width, top + new_height))
+
+                # Сохраняем обрезанное изображение
+                buffer = io.BytesIO()
+                img.save(buffer, format='JPEG', quality=95)
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
+                with open(temp_file, 'wb') as f:
+                    f.write(buffer.getvalue())
+                logger.info(f"Generated pixel art: {img.size[0]}x{img.size[1]} (cropped to 4:3)")
+                return temp_file
+            else:
+                # Соотношение правильное, сохраняем как есть
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
+                with open(temp_file, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Generated pixel art: {width}x{height} (4:3 ratio)")
+                return temp_file
+    except ImportError:
+        # Если PIL не установлен, просто сохраняем без проверки
+        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
+        with open(temp_file, 'wb') as f:
+            f.write(response.content)
+        return temp_file
     except Exception as e:
         logger.warning(f"Pixel art generation failed: {e}")
 
@@ -916,9 +956,9 @@ def publish_to_channel(text, image_topic=None, has_photo=True):
         if has_photo and image_topic:
             img_result = search_image(image_topic)
             if img_result and os.path.isfile(img_result):
-                # Локальный файл - отправляем как файл
+                # Локальный файл - отправляем как документ (без сжатия Telegram)
                 with open(img_result, 'rb') as photo_file:
-                    bot.send_photo(channel, photo=photo_file, caption=text, parse_mode="HTML", reply_markup=markup)
+                    bot.send_document(channel, document=photo_file, caption=text, parse_mode="HTML", reply_markup=markup)
                 # Удаляем временный файл
                 try:
                     os.remove(img_result)
@@ -1195,9 +1235,9 @@ def generate_interesting_post(message):
 
     if img_result and os.path.isfile(img_result):
         try:
-            # Отправляем картинку и текст ОДНИМ сообщением (caption)
+            # Отправляем картинку как документ (без сжатия)
             with open(img_result, 'rb') as photo_file:
-                bot.send_photo(message.chat.id, photo=photo_file, caption=post_text, parse_mode="HTML")
+                bot.send_document(message.chat.id, document=photo_file, caption=post_text, parse_mode="HTML")
             # Удаляем временный файл
             try:
                 os.remove(img_result)
@@ -1256,8 +1296,8 @@ def random_post(message):
         try:
             if os.path.isfile(img_result):
                 with open(img_result, 'rb') as photo_file:
-                    bot.send_photo(
-                        message.chat.id, photo=photo_file, caption=text, parse_mode="HTML",
+                    bot.send_document(
+                        message.chat.id, document=photo_file, caption=text, parse_mode="HTML",
                         reply_markup=get_post_inline_keyboard(message.chat.id)
                     )
                 try:
@@ -1295,10 +1335,21 @@ def create_custom_post(message):
     except:
         pass
     try:
-        bot.send_photo(
-            message.chat.id, photo=image_url, caption=post_text,
-            parse_mode="HTML", reply_markup=get_post_inline_keyboard(message.chat.id)
-        )
+        if image_url and os.path.isfile(image_url):
+            with open(image_url, 'rb') as photo_file:
+                bot.send_document(
+                    message.chat.id, document=photo_file, caption=post_text,
+                    parse_mode="HTML", reply_markup=get_post_inline_keyboard(message.chat.id)
+                )
+            try:
+                os.remove(image_url)
+            except:
+                pass
+        else:
+            bot.send_photo(
+                message.chat.id, photo=image_url, caption=post_text,
+                parse_mode="HTML", reply_markup=get_post_inline_keyboard(message.chat.id)
+            )
     except:
         bot.send_message(message.chat.id, post_text, reply_markup=get_post_inline_keyboard(message.chat.id))
 
@@ -1537,10 +1588,21 @@ def cmd_ai_post(message):
         if has_photo:
             img_url = search_image(topic)
             try:
-                bot.send_photo(
-                    message.chat.id, photo=img_url, caption=full_text, parse_mode="HTML",
-                    reply_markup=get_post_inline_keyboard(message.chat.id)
-                )
+                if img_url and os.path.isfile(img_url):
+                    with open(img_url, 'rb') as photo_file:
+                        bot.send_document(
+                            message.chat.id, document=photo_file, caption=full_text, parse_mode="HTML",
+                            reply_markup=get_post_inline_keyboard(message.chat.id)
+                        )
+                    try:
+                        os.remove(img_url)
+                    except:
+                        pass
+                else:
+                    bot.send_photo(
+                        message.chat.id, photo=img_url, caption=full_text, parse_mode="HTML",
+                        reply_markup=get_post_inline_keyboard(message.chat.id)
+                    )
             except:
                 bot.send_message(message.chat.id, full_text, reply_markup=get_post_inline_keyboard(message.chat.id))
         else:
