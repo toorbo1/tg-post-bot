@@ -9,7 +9,7 @@ from datetime import datetime
 # Добавляем путь к проекту
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ai_functions import generate_ai_post, generate_pixel_city_image
+from ai_functions import generate_ai_post, generate_pixel_city_image, generate_pixel_city_shedevrum
 
 
 class PostGeneratorApp:
@@ -33,14 +33,25 @@ class PostGeneratorApp:
         top_frame = ttk.Frame(self.root, padding="10")
         top_frame.pack(fill=tk.X)
 
-        # Кнопка генерации
-        self.gen_btn = ttk.Button(
-            top_frame,
-            text="Сгенерировать пост",
-            command=self.generate_post,
-            style="Accent.TButton"
+        # Кнопки генерации
+        btn_frame = ttk.Frame(top_frame)
+        btn_frame.pack(side=tk.LEFT)
+
+        self.poll_btn = ttk.Button(
+            btn_frame,
+            text="Pollinations (быстро)",
+            command=lambda: self.generate_post(method="pollinations"),
+            width=25
         )
-        self.gen_btn.pack(side=tk.LEFT, padx=(0, 10))
+        self.poll_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.shedevrum_btn = ttk.Button(
+            btn_frame,
+            text="Шедеврум (качество)",
+            command=lambda: self.generate_post(method="shedevrum"),
+            width=25
+        )
+        self.shedevrum_btn.pack(side=tk.LEFT)
 
         # Кнопка выхода
         ttk.Button(
@@ -109,7 +120,7 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
         )
         keys_label.pack(anchor=tk.NW)
 
-    def generate_post(self):
+    def generate_post(self, method="pollinations"):
         """Запускает генерацию в отдельном потоке"""
         if not self.deepseek_key:
             messagebox.showwarning(
@@ -120,9 +131,10 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             )
             return
 
-        # Блокируем кнопку
-        self.gen_btn.config(state=tk.DISABLED)
-        self.status_var.set("Генерация...")
+        # Блокируем кнопки
+        self.poll_btn.config(state=tk.DISABLED)
+        self.shedevrum_btn.config(state=tk.DISABLED)
+        self.status_var.set(f"Генерация ({'быстро' if method == 'pollinations' else 'качество'})...")
 
         # Очищаем виджеты
         self.text_widget.config(state=tk.NORMAL)
@@ -130,13 +142,14 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
         self.text_widget.insert(tk.END, "Генерация текста...\n")
         self.text_widget.config(state=tk.DISABLED)
 
-        self.img_status.config(text="Генерация изображения...")
+        method_name = "Pollinations" if method == "pollinations" else "Шедеврум"
+        self.img_status.config(text=f"Генерация изображения через {method_name}...")
 
-        # Запускаем генерацию в фоне
-        thread = threading.Thread(target=self._do_generate, daemon=True)
+        # Запускаем генерацию в фоне с выбранным методом
+        thread = threading.Thread(target=self._do_generate, args=(method,), daemon=True)
         thread.start()
 
-    def _do_generate(self):
+    def _do_generate(self, method="pollinations"):
         try:
             # Генерируем текст
             topics = [
@@ -152,12 +165,23 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             # Обновляем UI в главном потоке
             self.root.after(0, lambda: self._update_text(text))
 
-            # Генерируем изображение (быстро через Pollinations)
-            self.root.after(0, lambda: self.img_status.config(text="Генерация пиксельного города (10-20 сек)..."))
-            image = generate_pixel_city_image()
+            # Генерируем изображение выбранным методом
+            if method == "shedevrum":
+                self.root.after(0, lambda: self.img_status.config(text="Генерация через Шедеврум (1-3 мин)..."))
+                image = generate_pixel_city_shedevrum()
+            else:
+                self.root.after(0, lambda: self.img_status.config(text="Генерация через Pollinations (10-20 сек)..."))
+                image = generate_pixel_city_image()
 
             # Показываем результат
             self.root.after(0, lambda: self._show_image(image))
+
+        except Exception as e:
+            self.root.after(0, lambda: self._show_error(str(e)))
+        finally:
+            self.root.after(0, lambda: self.poll_btn.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.shedevrum_btn.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.status_var.set("Готов"))
 
         except Exception as e:
             self.root.after(0, lambda: self._show_error(str(e)))
