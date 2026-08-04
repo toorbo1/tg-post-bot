@@ -183,12 +183,6 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             self.root.after(0, lambda: self.shedevrum_btn.config(state=tk.NORMAL))
             self.root.after(0, lambda: self.status_var.set("Готов"))
 
-        except Exception as e:
-            self.root.after(0, lambda: self._show_error(str(e)))
-        finally:
-            self.root.after(0, lambda: self.gen_btn.config(state=tk.NORMAL))
-            self.root.after(0, lambda: self.status_var.set("Готов"))
-
     def _update_text(self, text):
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.delete(1.0, tk.END)
