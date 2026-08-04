@@ -47,7 +47,7 @@ class PostGeneratorApp:
 
         self.shedevrum_btn = ttk.Button(
             btn_frame,
-            text="Шедеврум (качество)",
+            text="FLUX Realism (топ качество)",
             command=lambda: self.generate_post(method="shedevrum"),
             width=25
         )
