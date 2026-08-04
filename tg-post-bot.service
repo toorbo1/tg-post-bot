@@ -1,0 +1,15 @@
+[Unit]
+Description=Telegram Post Generator Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/tg-post-bot
+Environment="BOT_TOKEN=8760700962:AAFHtirhjGkDQMN7nC5VthqB0e3DU2Zatjo"
+ExecStart=/root/tg-post-bot/venv/bin/python bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
