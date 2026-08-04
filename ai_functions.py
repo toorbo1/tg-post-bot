@@ -1,6 +1,7 @@
 """AI функции для генерации постов и изображений"""
 import os
 import random
+import time
 import requests
 import logging
 from PIL import Image
@@ -95,6 +96,7 @@ def generate_pixel_city_image():
     try:
         from selenium import webdriver
         from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         import io
@@ -110,6 +112,8 @@ def generate_pixel_city_image():
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
 
         driver = webdriver.Chrome(options=options)
         driver.set_page_load_timeout(60)
@@ -119,42 +123,117 @@ def generate_pixel_city_image():
             driver.get("https://shedevrum.yandex.ru/")
             logger.info("Page loaded")
 
-            # Ждём появления поля ввода
-            wait = WebDriverWait(driver, 30)
-            input_box = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "textarea, input[type='text']")))
+            # Ждём загрузки страницы (5 секунд)
+            time.sleep(5)
 
-            # Вводим промпт
-            input_box.clear()
-            input_box.send_keys(style_prompt)
-            logger.info("Prompt entered")
+            # Ищем все textarea и input элементы
+            logger.info("Searching for input field...")
 
-            # Ищем кнопку генерации и кликаем
-            buttons = driver.find_elements(By.CSS_SELECTOR, "button")
+            # Пробуем разные селекторы
+            selectors = [
+                "textarea",
+                "input[type='text']",
+                "[contenteditable='true']",
+                ".prompt-input",
+                "#prompt-input",
+                "div[role='textbox']"
+            ]
+
+            input_box = None
+            for selector in selectors:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        input_box = elements[0]
+                        logger.info(f"Found input with selector: {selector}")
+                        break
+                except:
+                    continue
+
+            if not input_box:
+                # Если не нашли по селектору, ищем первый кликабельный элемент
+                all_elements = driver.find_elements(By.TAG_NAME, "*")
+                for elem in all_elements:
+                    try:
+                        if elem.is_displayed() and elem.tag_name in ['input', 'textarea', 'div']:
+                            input_box = elem
+                            logger.info("Found clickable element by tag")
+                            break
+                    except:
+                        continue
+
+            if not input_box:
+                raise Exception("Could not find input field on page")
+
+            # Кликаем на поле ввода и вводим промпт
+            input_box.click()
+            time.sleep(1)
+
+            # Вводим текст посимвольно (как человек)
+            for char in style_prompt:
+                input_box.send_keys(char)
+                time.sleep(0.01)
+
+            logger.info("Prompt entered successfully")
+            time.sleep(1)
+
+            # Ищем и кликаем кнопку генерации
+            buttons = driver.find_elements(By.TAG_NAME, "button")
             generate_btn = None
+
             for btn in buttons:
-                if "Сгенерировать" in btn.text or "Generate" in btn.text or "Создать" in btn.text:
-                    generate_btn = btn
-                    break
+                if btn.is_displayed():
+                    text = btn.text.lower()
+                    if any(word in text for word in ["сгенерировать", "generate", "создать", "create", "go"]):
+                        generate_btn = btn
+                        break
 
             if not generate_btn:
-                # Пробуем найти по типичным классам
-                generate_btn = driver.find_element(By.CSS_SELECTOR, "button[class*='generate'], button[class*='create'], button[class*='submit']")
+                # Если не нашли кнопку по тексту, ищем по типичным классам
+                try:
+                    generate_btn = driver.find_element(By.CSS_SELECTOR, "button[class*='submit'], button[class*='send'], .action-button")
+                except:
+                    # Последняя надежда - Enter в поле ввода
+                    logger.info("No button found, pressing Enter in input")
+                    input_box.send_keys(Keys.RETURN)
+                    generate_btn = True  # Фейковая кнопка
 
-            generate_btn.click()
-            logger.info("Generation started")
+            if generate_btn and isinstance(generate_btn, type(True)) == False:
+                generate_btn.click()
+                logger.info("Generation button clicked")
 
             # Ждём результат (может занять 30-120 секунд)
-            logger.info("Waiting for generation (30-120 seconds)...")
+            logger.info("Waiting for generation (this may take 1-2 minutes)...")
 
-            # Ждём появления изображения
-            result_img = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "img.generated, img.result, .image-container img")),
-                message="Timeout waiting for image"
-            )
+            # Ждём появления изображения с разными селекторами
+            result_img = None
+            img_selectors = [
+                "img.generated",
+                "img.result",
+                ".image-container img",
+                ".result-image",
+                "[class*='image'] img",
+                "img[src]"
+            ]
+
+            wait = WebDriverWait(driver, 180)  # 3 минуты ожидания
+
+            for selector in img_selectors:
+                try:
+                    result_img = wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector)),
+                    )
+                    logger.info(f"Found image with selector: {selector}")
+                    break
+                except:
+                    continue
+
+            if not result_img:
+                raise Exception("Image generation timed out")
 
             # Получаем src изображения
             img_src = result_img.get_attribute("src")
-            logger.info(f"Image generated: {img_src[:100]}")
+            logger.info(f"Image generated: {img_src[:100]}...")
 
             # Скачиваем изображение
             img_response = requests.get(img_src, timeout=60)
