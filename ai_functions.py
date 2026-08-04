@@ -91,17 +91,17 @@ def generate_ai_post(topic, style="long"):
 
 
 def generate_pixel_city_image():
-    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations.ai (быстро и без ключа)"""
+    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations с FLUX-REALISM (топовое качество!)"""
 
     # Промпт для пиксельного города
-    style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, high quality, crisp edges, ultra detailed"
+    style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, ultra detailed, masterpiece"
 
     try:
-        # Используем Pollinations.ai (работает без ключа, быстро!)
+        # Используем Pollinations.ai с моделью flux-realism + enhance
         encoded_prompt = requests.utils.quote(style_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&model=turbo"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&enhance=true&nologo=true&seed={random.randint(1, 999999)}"
 
-        logger.info(f"Generating pixel city via Pollinations (fast)...")
+        logger.info(f"Generating via Pollinations FLUX-REALISM (top quality)...")
 
         response = requests.get(url, timeout=120)
 
@@ -111,7 +111,7 @@ def generate_pixel_city_image():
 
             img = Image.open(io.BytesIO(response.content))
             width, height = img.size
-            logger.info(f"Generated image: {width}x{height}")
+            logger.info(f"✅ FLUX generated: {width}x{height}")
 
             # Проверяем соотношение сторон и обрезаем до 4:3
             target_ratio = 4/3
@@ -130,21 +130,21 @@ def generate_pixel_city_image():
 
                 buffer = io.BytesIO()
                 img.save(buffer, format='PNG', quality=95)
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"flux_city_{random.randint(1, 999999)}.png")
                 with open(temp_file, 'wb') as f:
                     f.write(buffer.getvalue())
                 logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
                 return temp_file
             else:
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"flux_city_{random.randint(1, 999999)}.png")
                 with open(temp_file, 'wb') as f:
                     f.write(response.content)
-                logger.info(f"Saved pixel city: {width}x{height}")
+                logger.info(f"Saved flux city: {width}x{height}")
                 return temp_file
         else:
             logger.error(f"Pollinations error: {response.status_code}")
     except Exception as e:
-        logger.error(f"Image generation failed: {e}")
+        logger.error(f"FLUX generation failed: {e}")
 
     return None
 
