@@ -152,8 +152,8 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             # Обновляем UI в главном потоке
             self.root.after(0, lambda: self._update_text(text))
 
-            # Генерируем изображение
-            self.root.after(0, lambda: self.img_status.config(text="Генерация пиксельного города..."))
+            # Генерируем изображение (быстро через Pollinations)
+            self.root.after(0, lambda: self.img_status.config(text="Генерация пиксельного города (10-20 сек)..."))
             image = generate_pixel_city_image()
 
             # Показываем результат
