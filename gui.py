@@ -45,10 +45,18 @@ class PostGeneratorApp:
         )
         self.poll_btn.pack(side=tk.LEFT, padx=(0, 5))
 
+        self.flux_btn = ttk.Button(
+            btn_frame,
+            text="FLUX Realism (качество)",
+            command=lambda: self.generate_post(method="flux"),
+            width=25
+        )
+        self.flux_btn.pack(side=tk.LEFT, padx=(0, 5))
+
         self.shedevrum_btn = ttk.Button(
             btn_frame,
-            text="FLUX Realism (топ качество)",
-            command=lambda: self.generate_post(method="shedevrum"),
+            text="Шедеврум (реальный)",
+            command=lambda: self.generate_post(method="shedevrum_real"),
             width=25
         )
         self.shedevrum_btn.pack(side=tk.LEFT)
@@ -131,10 +139,17 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             )
             return
 
-        # Блокируем кнопки
+        # Блокируем все кнопки
         self.poll_btn.config(state=tk.DISABLED)
+        self.flux_btn.config(state=tk.DISABLED)
         self.shedevrum_btn.config(state=tk.DISABLED)
-        self.status_var.set(f"Генерация ({'быстро' if method == 'pollinations' else 'качество'})...")
+
+        method_names = {
+            "pollinations": "быстро",
+            "flux": "качество",
+            "shedevrum_real": "реальный Шедеврум"
+        }
+        self.status_var.set(f"Генерация ({method_names.get(method, '')})...")
 
         # Очищаем виджеты
         self.text_widget.config(state=tk.NORMAL)
@@ -142,8 +157,12 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
         self.text_widget.insert(tk.END, "Генерация текста...\n")
         self.text_widget.config(state=tk.DISABLED)
 
-        method_name = "Pollinations" if method == "pollinations" else "Шедеврум"
-        self.img_status.config(text=f"Генерация изображения через {method_name}...")
+        display_names = {
+            "pollinations": "Pollinations",
+            "flux": "FLUX Realism",
+            "shedevrum_real": "Шедеврум (в фоне)"
+        }
+        self.img_status.config(text=f"Генерация изображения через {display_names.get(method, '')}...")
 
         # Запускаем генерацию в фоне с выбранным методом
         thread = threading.Thread(target=self._do_generate, args=(method,), daemon=True)
@@ -166,11 +185,17 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             self.root.after(0, lambda: self._update_text(text))
 
             # Генерируем изображение выбранным методом
-            if method == "shedevrum":
-                self.root.after(0, lambda: self.img_status.config(text="Генерация через Шедеврум (1-3 мин)..."))
-                image = generate_pixel_city_shedevrum()
+            if method == "flux":
+                self.root.after(0, lambda: self.img_status.config(text="Генерация через FLUX Realism (15-30 сек)..."))
+                from ai_functions import generate_pixel_city_image
+                image = generate_pixel_city_image()
+            elif method == "shedevrum_real":
+                self.root.after(0, lambda: self.img_status.config(text="Генерация через Шедеврум (в фоне, 1-3 мин)..."))
+                from shedevrum_headless import generate_pixel_city_shedevrum_headless
+                image = generate_pixel_city_shedevrum_headless()
             else:
                 self.root.after(0, lambda: self.img_status.config(text="Генерация через Pollinations (10-20 сек)..."))
+                from ai_functions import generate_pixel_city_image
                 image = generate_pixel_city_image()
 
             # Показываем результат
@@ -180,6 +205,7 @@ DeepSeek: {'✓ Настроен' if self.deepseek_key else '✗ Не настр
             self.root.after(0, lambda: self._show_error(str(e)))
         finally:
             self.root.after(0, lambda: self.poll_btn.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.flux_btn.config(state=tk.NORMAL))
             self.root.after(0, lambda: self.shedevrum_btn.config(state=tk.NORMAL))
             self.root.after(0, lambda: self.status_var.set("Готов"))
 

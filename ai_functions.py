@@ -91,17 +91,23 @@ def generate_ai_post(topic, style="long"):
 
 
 def generate_pixel_city_image():
-    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations с FLUX-REALISM (топовое качество!)"""
+    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations с FLUX-REALISM (максимальное качество!)"""
 
-    # Промпт для пиксельного города
-    style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, ultra detailed, masterpiece"
+    # Улучшенный промпт для FLUX-REALISM модели
+    style_prompt = "masterpiece pixel art cyberpunk city, neon purple and cyan colors, highly detailed skyscrapers, 16-bit retro game aesthetic, sharp crisp pixels, no blur, high contrast, futuristic skyline with flying cars and holograms, clean lines, professional digital art, 4:3 aspect ratio, ultra detailed, best quality"
 
     try:
-        # Используем Pollinations.ai с моделью flux-realism + enhance
+        # Используем Pollinations.ai с моделью flux-realism + enhance для лучшего качества
         encoded_prompt = requests.utils.quote(style_prompt)
+
+        # Параметры для максимального качества:
+        # - model=flux-realism: лучшая детализация лиц и объектов
+        # - enhance=true: автоматическое улучшение света и качества
+        # - nologo=true: без водяных знаков
+        # - width=1024&height=768: формат 4:3
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&enhance=true&nologo=true&seed={random.randint(1, 999999)}"
 
-        logger.info(f"Generating via Pollinations FLUX-REALISM (top quality)...")
+        logger.info(f"Generating via Pollinations FLUX-REALISM (max quality)...")
 
         response = requests.get(url, timeout=120)
 
@@ -111,40 +117,68 @@ def generate_pixel_city_image():
 
             img = Image.open(io.BytesIO(response.content))
             width, height = img.size
-            logger.info(f"✅ FLUX generated: {width}x{height}")
+            logger.info(f"✅ FLUX-REALISM generated: {width}x{height}")
 
-            # Проверяем соотношение сторон и обрезаем до 4:3
+            # Проверяем соотношение сторон и обрезаем до 4:3 если нужно
             target_ratio = 4/3
             current_ratio = width / height
 
             if abs(current_ratio - target_ratio) > 0.1:
                 logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
                 if current_ratio > target_ratio:
+                    # Слишком широкое - обрезаем по ширине
                     new_width = int(height * target_ratio)
                     left = (width - new_width) // 2
                     img = img.crop((left, 0, left + new_width, height))
                 else:
+                    # Слишком высокое - обрезаем по высоте
                     new_height = int(width / target_ratio)
                     top = (height - new_height) // 2
                     img = img.crop((0, top, width, top + new_height))
 
-                buffer = io.BytesIO()
-                img.save(buffer, format='PNG', quality=95)
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"flux_city_{random.randint(1, 999999)}.png")
-                with open(temp_file, 'wb') as f:
-                    f.write(buffer.getvalue())
-                logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
-                return temp_file
-            else:
-                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"flux_city_{random.randint(1, 999999)}.png")
-                with open(temp_file, 'wb') as f:
-                    f.write(response.content)
-                logger.info(f"Saved flux city: {width}x{height}")
-                return temp_file
+                logger.info(f"After crop: {img.size[0]}x{img.size[1]}")
+
+            # Сохраняем с высоким качеством
+            buffer = io.BytesIO()
+            img.save(buffer, format='PNG', quality=95)
+            temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"flux_city_{random.randint(1, 999999)}.png")
+            with open(temp_file, 'wb') as f:
+                f.write(buffer.getvalue())
+
+            logger.info(f"Saved to: {temp_file}")
+            return temp_file
         else:
-            logger.error(f"Pollinations error: {response.status_code}")
+            logger.error(f"Pollinations error: {response.status_code} - {response.text[:200]}")
+
+            # Fallback на обычную модель если flux-realism недоступен
+            logger.info("Falling back to standard model...")
+            return _generate_with_fallback(style_prompt)
+
     except Exception as e:
-        logger.error(f"FLUX generation failed: {e}")
+        logger.error(f"FLUX-REALISM generation failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Пробуем fallback
+        return _generate_with_fallback(style_prompt if 'style_prompt' in locals() else "pixel art city")
+
+
+def _generate_with_fallback(prompt):
+    """Fallback функция если FLUX-REALISM не сработал"""
+    try:
+        encoded_prompt = requests.utils.quote(prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&nologo=true&seed={random.randint(1, 999999)}"
+
+        response = requests.get(url, timeout=120)
+        if response.status_code == 200:
+            from PIL import Image
+            import io
+
+            img = Image.open(io.BytesIO(response.content))
+            temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pollinations_{random.randint(1, 999999)}.png")
+            img.save(temp_file, format='PNG', quality=95)
+            return temp_file
+    except Exception as e:
+        logger.error(f"Fallback also failed: {e}")
 
     return None
 
