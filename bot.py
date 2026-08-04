@@ -1098,9 +1098,11 @@ def perform_auto_post(index):
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn_create = types.KeyboardButton("📝 Посты")
+    btn_interesting = types.KeyboardButton("🎲 Интересный пост")
     btn_admin = types.KeyboardButton("⚙️ Настройки автопостинга")
     btn_help = types.KeyboardButton("ℹ️ Помощь")
-    markup.add(btn_create, btn_admin, btn_help)
+    markup.add(btn_create, btn_interesting)
+    markup.add(btn_admin, btn_help)
     return markup
 
 def get_post_inline_keyboard(chat_id):
@@ -1168,6 +1170,63 @@ def send_help(message):
         "/status — статус бота"
     )
     bot.send_message(message.chat.id, help_text, reply_markup=get_main_keyboard())
+
+@bot.message_handler(func=lambda msg: msg.text == "🎲 Интересный пост")
+def generate_interesting_post(message):
+    """Генерирует интересный пост с случайной темой"""
+    # Случайные интересные темы
+    interesting_topics = [
+        "квантовые компьютеры",
+        "искусственный интеллект будущего",
+        "кибербезопасность в 2030",
+        "виртуальная реальность",
+        "блокчейн технологии",
+        "космические технологии",
+        "нейросети и творчество",
+        "цифровая приватность",
+        "будущее интернета",
+        "пиксельная эстетика",
+        "ретро гейминг",
+        "хакерская культура",
+        "open source проекты",
+        "криптография",
+        "децентрализованный интернет",
+    ]
+
+    topic = random.choice(interesting_topics)
+
+    # Генерируем пост с характером пиксельной девочки
+    post_text = generate_local_post(topic, random.choice(["casual", "expert", "story", "emotional"]))
+
+    # Добавляем эмодзи и хештеги
+    emojis = ["💜", "✨", "🚀", "🎮", "🔮", "⚡"]
+    hashtags = f"#{topic.replace(' ', '_')} #пиксельная_магия #каролина"
+
+    full_text = f"{post_text}\n\n{random.choice(emojis)} {hashtags}"
+
+    # Отправляем текст
+    bot.send_message(message.chat.id, full_text, reply_markup=get_post_inline_keyboard(message.chat.id))
+
+    # Генерируем и отправляем картинку
+    status_msg = bot.send_message(message.chat.id, "⏳ Создаю пиксельную картинку...")
+    img_result = search_image(topic)
+
+    if img_result:
+        try:
+            if os.path.isfile(img_result):
+                with open(img_result, 'rb') as photo_file:
+                    bot.send_photo(message.chat.id, photo=photo_file)
+                try:
+                    os.remove(img_result)
+                except:
+                    pass
+            else:
+                bot.send_photo(message.chat.id, photo=img_result)
+            bot.delete_message(message.chat.id, status_msg.message_id)
+        except Exception as e:
+            bot.edit_message_text(message.chat.id, status_msg.message_id, f"Картинка создана! 💜")
+    else:
+        bot.delete_message(message.chat.id, status_msg.message_id)
 
 @bot.message_handler(func=lambda msg: msg.text == "📝 Управление постами")
 def manage_posts(message):
