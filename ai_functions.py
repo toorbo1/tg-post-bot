@@ -90,86 +90,59 @@ def generate_ai_post(topic, style="long"):
 
 
 def generate_pixel_city_image():
-    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД в высоком качестве 4:3 через Шедеврум"""
-
-    if not SHEDEVRUM_API_KEY:
-        logger.error("❌ SHEDEVRUM_API_KEY not set! Cannot generate image.")
-        return None
+    """Генерирует ПИКСЕЛЬНЫЙ ГОРОД через Pollinations.ai в высоком качестве 4:3"""
 
     # Промпт для пиксельного города
     style_prompt = "pixel art cyberpunk city, neon purple and cyan colors, detailed skyscrapers, 16-bit retro game style, sharp pixels, no blur, high contrast, futuristic skyline, flying cars, holograms, clean lines, professional pixel art, 4:3 aspect ratio, high quality, crisp edges, ultra detailed"
 
     try:
-        # Реальное подключение к API Шедеврум
-        url = "https://api.shedevrum.yandex.ru/v1/generate"
-        headers = {
-            "Authorization": f"Bearer {SHEDEVRUM_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        # Используем Pollinations.ai (работает без ключа)
+        encoded_prompt = requests.utils.quote(style_prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&seed={random.randint(1, 999999)}&nologo=true&model=turbo"
 
-        payload = {
-            "prompt": style_prompt,
-            "width": 1024,
-            "height": 768,
-            "steps": 50,
-            "guidance_scale": 8.0,
-            "seed": random.randint(1, 999999),
-            "negative_prompt": "blur, low quality, anti-aliased, smooth, realistic"
-        }
+        logger.info(f"Generating pixel city via Pollinations...")
 
-        logger.info(f"🎨 Generating pixel city via SheDevrum...")
-
-        response = requests.post(url, headers=headers, json=payload, timeout=120)
+        response = requests.get(url, timeout=120)
 
         if response.status_code == 200:
-            data = response.json()
-            # Получаем URL изображения
-            image_url = data.get("result", {}).get("image_url") or data.get("result", {}).get("images", [{}])[0].get("url")
+            from PIL import Image
+            import io
 
-            if image_url:
-                logger.info(f"📸 SheDevrum returned image URL")
-                # Скачиваем изображение
-                img_response = requests.get(image_url, timeout=60)
-                if img_response.status_code == 200:
-                    img = Image.open(io.BytesIO(img_response.content))
-                    width, height = img.size
-                    logger.info(f"✅ SheDevrum generated pixel city: {width}x{height}")
+            img = Image.open(io.BytesIO(response.content))
+            width, height = img.size
+            logger.info(f"Generated image: {width}x{height}")
 
-                    # Проверяем соотношение сторон и обрезаем до 4:3
-                    target_ratio = 4/3
-                    current_ratio = width / height
+            # Проверяем соотношение сторон и обрезаем до 4:3
+            target_ratio = 4/3
+            current_ratio = width / height
 
-                    if abs(current_ratio - target_ratio) > 0.1:
-                        logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
-                        if current_ratio > target_ratio:
-                            new_width = int(height * target_ratio)
-                            left = (width - new_width) // 2
-                            img = img.crop((left, 0, left + new_width, height))
-                        else:
-                            new_height = int(width / target_ratio)
-                            top = (height - new_height) // 2
-                            img = img.crop((0, top, width, top + new_height))
-
-                        buffer = io.BytesIO()
-                        img.save(buffer, format='JPEG', quality=95)
-                        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_city_{random.randint(1, 999999)}.jpg")
-                        with open(temp_file, 'wb') as f:
-                            f.write(buffer.getvalue())
-                        logger.info(f"✅ Cropped pixel city to: {img.size[0]}x{img.size[1]} (4:3)")
-                        return temp_file
-                    else:
-                        temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"shedevrum_city_{random.randint(1, 999999)}.jpg")
-                        with open(temp_file, 'wb') as f:
-                            f.write(img_response.content)
-                        logger.info(f"✅ Saved pixel city: {width}x{height} (4:3)")
-                        return temp_file
+            if abs(current_ratio - target_ratio) > 0.1:
+                logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
+                if current_ratio > target_ratio:
+                    new_width = int(height * target_ratio)
+                    left = (width - new_width) // 2
+                    img = img.crop((left, 0, left + new_width, height))
                 else:
-                    logger.error(f"Failed to download image: {img_response.status_code}")
+                    new_height = int(width / target_ratio)
+                    top = (height - new_height) // 2
+                    img = img.crop((0, top, width, top + new_height))
+
+                buffer = io.BytesIO()
+                img.save(buffer, format='PNG', quality=95)
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                with open(temp_file, 'wb') as f:
+                    f.write(buffer.getvalue())
+                logger.info(f"Cropped to: {img.size[0]}x{img.size[1]} (4:3)")
+                return temp_file
             else:
-                logger.warning("No image URL in SheDevrum response")
+                temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_city_{random.randint(1, 999999)}.png")
+                with open(temp_file, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Saved pixel city: {width}x{height}")
+                return temp_file
         else:
-            logger.error(f"❌ SheDevrum API error: {response.status_code} - {response.text[:300]}")
+            logger.error(f"Pollinations error: {response.status_code}")
     except Exception as e:
-        logger.error(f"❌ SheDevrum generation failed: {e}")
+        logger.error(f"SheDevrum generation failed: {e}")
 
     return None
