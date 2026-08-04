@@ -105,7 +105,8 @@ def generate_pixel_city_image():
         # - enhance=true: автоматическое улучшение света и качества
         # - nologo=true: без водяных знаков
         # - width=1024&height=768: формат 4:3
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&model=flux-realism&enhance=true&nologo=true&seed={random.randint(1, 999999)}"
+        # Используем бесплатную модель без ограничений
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=768&enhance=true&nologo=true&seed={random.randint(1, 999999)}"
 
         logger.info(f"Generating via Pollinations FLUX-REALISM (max quality)...")
 
