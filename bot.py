@@ -748,16 +748,16 @@ POLLINATIONS_KEY = os.environ.get("POLLINATIONS_KEY", "")
 def generate_pixel_art_image(prompt_text):
     """Генерирует пиксельную картинку через Pollinations.ai"""
     # Промпт в стиле персонажа: 2D pixel art, cartoon, hacker girl, purple/black theme
-    style_prompt = f"2D pixel art, cartoon style, chibi character, {prompt_text}, purple and black color scheme, cyberpunk aesthetic, minimalist, retro game art, 16-bit"
+    style_prompt = f"2D pixel art, cartoon style, chibi character, {prompt_text}, purple and black color scheme, cyberpunk aesthetic, minimalist, retro game art, 16-bit, sharp details, high quality"
 
     # Кодируем промпт для URL
     encoded_prompt = requests.utils.quote(style_prompt)
 
-    # Pollinations.ai (без ключа или с ключом если есть)
+    # Pollinations.ai (без ключа или с ключом если есть) - увеличенное разрешение 1024x1024
     if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}"
     else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={random.randint(1, 999999)}&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 999999)}&nologo=true"
 
     try:
         response = requests.get(url, timeout=30)
@@ -1202,24 +1202,25 @@ def generate_interesting_post(message):
     status_msg = bot.send_message(message.chat.id, "⏳ Создаю пиксельную картинку...")
     img_result = search_image(topic)
 
-    if img_result:
+    if img_result and os.path.isfile(img_result):
         try:
-            # Отправляем картинку и текст ОДНИМ сообщением
-            if os.path.isfile(img_result):
-                with open(img_result, 'rb') as photo_file:
-                    bot.send_photo(message.chat.id, photo=photo_file, caption=post_text, parse_mode="HTML")
-                try:
-                    os.remove(img_result)
-                except:
-                    pass
-            else:
-                bot.send_photo(message.chat.id, photo=img_result, caption=post_text, parse_mode="HTML")
+            # Отправляем картинку и текст ОДНИМ сообщением (caption)
+            with open(img_result, 'rb') as photo_file:
+                bot.send_photo(message.chat.id, photo=photo_file, caption=post_text, parse_mode="HTML")
+            # Удаляем временный файл
+            try:
+                os.remove(img_result)
+            except:
+                pass
+            # Удаляем статусное сообщение
             bot.delete_message(message.chat.id, status_msg.message_id)
         except Exception as e:
-            bot.edit_message_text(f"Картинка создана! 💜", message.chat.id, status_msg.message_id)
+            # Если ошибка - отправляем хотя бы текст
+            bot.edit_message_text(f"Ошибка при отправке картинки: {e}", message.chat.id, status_msg.message_id)
             bot.send_message(message.chat.id, post_text, parse_mode="HTML")
     else:
-        bot.delete_message(message.chat.id, status_msg.message_id)
+        # Картинка не сгенерировалась - отправляем только текст
+        bot.edit_message_text("Картинка не получилась, но вот текст:", message.chat.id, status_msg.message_id)
         bot.send_message(message.chat.id, post_text, parse_mode="HTML")
 
 @bot.message_handler(func=lambda msg: msg.text == "📝 Управление постами")
