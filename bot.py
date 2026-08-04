@@ -753,12 +753,14 @@ def generate_pixel_art_image(prompt_text):
     # Кодируем промпт для URL
     encoded_prompt = requests.utils.quote(style_prompt)
 
-    # Pollinations.ai - строго 4:3 (1024x768) с ультра-четкостью
+    # Pollinations.ai - строго 4:3 (1280x960) с ультра-четкостью
     # Используем больший размер для лучшего качества при сжатии
     if POLLINATIONS_KEY:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&enhance=true&quality=ultra&style=raw&no-blur&sharp"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&token={POLLINATIONS_KEY}&model=turbo"
     else:
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&enhance=true&quality=ultra&style=raw&no-blur&sharp"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=960&seed={random.randint(1, 999999)}&nologo=true&model=turbo"
+
+    logger.info(f"Generating image with URL: {url[:200]}...")
 
     try:
         response = requests.get(url, timeout=60)
@@ -768,12 +770,14 @@ def generate_pixel_art_image(prompt_text):
             import io
             img = Image.open(io.BytesIO(response.content))
             width, height = img.size
+            logger.info(f"Generated image size: {width}x{height}")
 
             # Если соотношение не 4:3, обрезаем
             target_ratio = 4/3
             current_ratio = width / height
 
             if abs(current_ratio - target_ratio) > 0.1:
+                logger.info(f"Cropping from {current_ratio:.2f} to 4:3")
                 # Обрезаем до 4:3
                 if current_ratio > target_ratio:
                     # Слишком широкое - обрезаем по ширине
@@ -792,14 +796,14 @@ def generate_pixel_art_image(prompt_text):
                 temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
                 with open(temp_file, 'wb') as f:
                     f.write(buffer.getvalue())
-                logger.info(f"Generated pixel art: {img.size[0]}x{img.size[1]} (cropped to 4:3)")
+                logger.info(f"Cropped pixel art to: {img.size[0]}x{img.size[1]} (4:3)")
                 return temp_file
             else:
                 # Соотношение правильное, сохраняем как есть
                 temp_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"pixel_art_{random.randint(1, 999999)}.jpg")
                 with open(temp_file, 'wb') as f:
                     f.write(response.content)
-                logger.info(f"Generated pixel art: {width}x{height} (4:3 ratio)")
+                logger.info(f"Saved pixel art: {width}x{height} (4:3 ratio)")
                 return temp_file
     except ImportError:
         # Если PIL не установлен, просто сохраняем без проверки
